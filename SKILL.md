@@ -11,9 +11,33 @@ Use this skill to produce polished public blog content without turning the site 
 
 Never let a model invent project facts, deployment status, metrics, screenshots, customer names, secrets, private URLs, API keys, local paths, or production infrastructure details.
 
+## Start With A Mode Gate
+
+Before planning, drafting, rewriting, or reviewing a post, explicitly choose and
+record the writing mode:
+
+1. **Codex-only scaffold/review** — use repository evidence and scripts without
+   model generation. Record `model channel: none` in the evidence pack. Do not
+   force model setup for this mode.
+2. **Model-assisted draft/rewrite** — ask the user to set or confirm the model
+   profiles before generation. Prefer the smart-search-style guided setup:
+   `npm.cmd run blog:model -- setup`, then masked offline
+   `npm.cmd run blog:model -- status --all --format markdown` and
+   `npm.cmd run blog:model -- doctor --all --format markdown`. If a profile
+   resolves through fallback or legacy values, surface that and recommend setup
+   before generation.
+3. **Review-only** — review an existing draft against evidence, safety, column
+   fit, overlap, voice, image, and promotion gates. Record any missing model
+   setup only if generation is requested.
+4. **Publish reviewed content** — only after review passes, update runtime blog
+   data and public indexes.
+
+Do not run `doctor --live`, `blog:draft -- --generate`, or any other live model
+request unless the user explicitly approves that small model task.
+
 ## Route The Task
 
-- **Plan or draft a new post**: read `src/data/blogShared.ts`, then read `references/templates.md` for the target column. Use `npm.cmd run blog:plan` and `npm.cmd run blog:draft -- --slug <slug> --force` when the topic exists in `scripts/blog-rewrite-plan.json`.
+- **Plan or draft a new post**: start with the mode gate, read `src/data/blogShared.ts`, then read `references/templates.md` for the target column. Use `npm.cmd run blog:plan` and `npm.cmd run blog:draft -- --slug <slug> --force` when the topic exists in `scripts/blog-rewrite-plan.json`.
 - **Rewrite a legacy post**: read `content-archive/legacy-blog/rewrite-queue.json`, then inspect the archived source under `content-archive/legacy-blog/posts/`. Treat it as raw material only; rebuild evidence before drafting.
 - **Review an existing draft**: read the draft in `content-drafts/`, then use `references/review-and-prompts.md` for fact, safety, structure, and promotion gates.
 - **Publish reviewed content**: update typed runtime data only after review: `src/data/blog.ts`, `src/data/blog-posts/<slug>.ts`, `src/data/blogContent.ts`, and `src/data/blogCuration.ts` as needed.
@@ -29,7 +53,9 @@ Before drafting, capture:
 - uncertain or stale facts
 - forbidden/private details
 - project-page overlap risk
+- writing mode
 - intended model strategy
+- selected model channel, or `none` for Codex-only mode
 
 For project-related posts, do not rely only on README files. Read code, public project data, tests, deployment scripts, screenshots, Trellis task notes, and existing project pages.
 
@@ -37,17 +63,33 @@ For image decisions, read `references/usage.md`. Prefer real screenshots and dia
 
 ## Model Channels
 
-Default strategy:
+Default important-post strategy:
 
 ```text
-Codex evidence pack -> one strong content model draft/rewrite -> Codex review/edit/ingest
+Codex evidence pack -> Codex scaffold -> strong profile draft -> review profile polish -> Codex final fact/safety review
 ```
 
-- Long-form drafting or rewriting: use the `strong` profile with one strong content model such as GLM-5.2, DeepSeek V4 Pro, Gemini 3.1 Pro, or an equivalent configured channel.
-- Outlines, summaries, or low-risk batch checks: use the `fast` profile with Gemini 3.5 Flash or an equivalent low-cost model.
-- Review experiments: use the `review` profile only after Codex has completed evidence and safety review; do not treat model review as authority.
-- Multi-model comparison is exceptional: use it only for important posts, style uncertainty, or disputed framing.
+- Evidence, comparison, final safety, and ingestion: Codex owns the evidence
+  pack, compares generated text against facts, fuses usable parts, and rejects
+  unsupported claims.
+- Long-form drafting or rewriting: use the `strong` profile, recommended
+  GLM-5.2 or Gemini 3.1 Pro, or an equivalent configured channel.
+- Polishing: use the `review` profile, recommended DeepSeek V4 Pro, for
+  structure, tone, density, and lower AI-smell rewrites; do not treat model
+  review as authority.
+- Outlines, summaries, titles, or low-risk batch checks: use the `fast` profile,
+  recommended Gemini 3.5 Flash or equivalent low-cost model.
+- Single-profile generation is acceptable for small or low-risk drafts; use the
+  staged flow for important posts, style uncertainty, or disputed framing.
 - Default to serial calls. If parallel model use is necessary, split across different relays or provider profiles.
+- Each profile may have optional same-profile fallback channels, for example
+  `BLOG_DRAFT_REVIEW_FALLBACK_1_*`. During real draft or polish generation, the
+  script may try `primary -> fallback-1 -> fallback-2` serially after a channel
+  failure. Fallback never crosses roles: `review` fallback channels stay under
+  `review`, and do not silently switch to `strong` or `fast`.
+- Use `npm.cmd run blog:model -- setup --profile <profile> --fallback` to add
+  a fallback channel later. `status` and default `doctor` must show fallback
+  readiness with masked base URL/API-key status only.
 - Store real relay URLs and API keys only in `.env.local` or external configuration. Public repo files may contain placeholders only.
 
 Draft generation uses OpenAI-compatible chat completions. Prefer named `BLOG_DRAFT_*` profiles; old `GEMINI_*` variables remain fallback:
@@ -77,11 +119,27 @@ BLOG_DRAFT_REVIEW_API_KEY=
 BLOG_DRAFT_REVIEW_MODEL=
 BLOG_DRAFT_REVIEW_PROVIDER=
 BLOG_DRAFT_REVIEW_TEMPERATURE=0.2
+
+BLOG_DRAFT_REVIEW_FALLBACK_1_BASE_URL=
+BLOG_DRAFT_REVIEW_FALLBACK_1_API_KEY=
+BLOG_DRAFT_REVIEW_FALLBACK_1_MODEL=
+BLOG_DRAFT_REVIEW_FALLBACK_1_PROVIDER=
+BLOG_DRAFT_REVIEW_FALLBACK_1_TEMPERATURE=0.2
 ```
 
-Use `npm.cmd run blog:draft -- --slug <slug> --force --generate --profile strong` for long-form drafts. If a named profile is missing a value, the script falls back to the default `BLOG_DRAFT_*` channel, then legacy `GEMINI_*`.
+Use `npm.cmd run blog:model -- setup` for guided three-profile setup, or
+`npm.cmd run blog:model -- setup --profile <profile>` for one profile. Use
+`npm.cmd run blog:draft -- --slug <slug> --force --generate --profile strong`
+for the first model draft only after setup and approval. Use
+`npm.cmd run blog:draft -- --slug <slug> --polish-from content-drafts/<file>.md --profile review`
+when a review/polish pass should rewrite the existing `## Draft Body` while
+preserving the evidence scaffold. If a named profile is missing a value, the
+script falls back to the default `BLOG_DRAFT_*` channel, then legacy
+`GEMINI_*`, and the workflow must surface that as a setup gap.
 
-Do not run `blog:draft -- --generate` unless the evidence pack is complete and a private model channel is intentionally configured.
+Do not run `blog:draft -- --generate` unless the run is explicitly
+`model-assisted`, the evidence pack is complete, a private model channel is
+intentionally configured, and the user has approved the generation step.
 
 For setup details and profile examples, read `references/usage.md`.
 

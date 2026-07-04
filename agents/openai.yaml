@@ -1,4 +1,4 @@
 interface:
   display_name: "Blog Content Pipeline"
-  short_description: "Evidence-first blog workflow with model profiles"
-  default_prompt: "Use $blog-content-pipeline to set up model profiles, plan, rewrite, review, or publish a BIAU Port blog post with evidence packs, image policy, and public-content gates."
+  short_description: "Evidence-first blog workflow with fallback profiles"
+  default_prompt: "Use $blog-content-pipeline to configure model profiles with same-role fallback channels, plan, rewrite, review, or publish a BIAU Port blog post with evidence and public-content gates."

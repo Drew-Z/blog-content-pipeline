@@ -6,6 +6,8 @@ Use this reference when handing evidence to a content model, reviewing a draft, 
 
 Collect this before drafting:
 
+- Writing mode: `Codex-only scaffold/review`, `model-assisted draft/rewrite`,
+  `review-only`, or `publish reviewed content`.
 - Column: `knowledge`, `project-notes`, `resources`, `ai-daily`, or `build-log`.
 - Target reader and reader value.
 - Evidence sources read.
@@ -14,19 +16,33 @@ Collect this before drafting:
 - Forbidden/private details.
 - Related project page or prior post.
 - Desired output: scaffold, model draft, rewrite, review, or publish.
-- Model channel: configured provider/model name, or `none` for Codex-only scaffold.
+- Model channels: configured non-secret provider/model labels for Codex,
+  `strong`, `review`, and optionally `fast`; use `none` for Codex-only
+  scaffold/review.
+- Model setup status: whether `setup`, masked `status`, and offline `doctor`
+  were run for model-assisted drafting; record fallback/legacy warnings without
+  exposing secrets.
 
 ## Model Handoff Prompt
 
-Use one strong content model by default.
+Use the staged model-assisted flow for important posts:
+
+```text
+Codex evidence pack -> Codex scaffold -> strong profile draft -> Codex compare/fuse -> review profile polish -> Codex final review
+```
+
+Single-profile generation is acceptable for small or low-risk drafts after the
+same evidence and setup gates pass.
 
 ```text
 Write a public Chinese technical blog draft for BIAU Port.
 
+Writing mode: model-assisted draft/rewrite
 Column: <column zh/en>
 Title: <title>
 Target reader: <reader>
 Reader value: <why this is worth publishing>
+Model channel: <strong profile non-secret provider/model label only>
 
 Evidence sources:
 <paths or URLs>
@@ -60,6 +76,11 @@ Hard rules:
 - Voice: no generic AI filler, inflated claims, resume tone, interview tone, or learning-day framing.
 - Structure: title, detail, sections, takeaways, tags, scenarios, and checklist are concrete.
 - Public assistant impact: summary and tags will improve retrieval rather than drown project facts.
+- Mode gate: model-assisted drafts have an explicit configured channel; Codex-only
+  drafts record `none`; live checks or generation were explicitly approved.
+- Multi-model flow: important posts record Codex scaffold/comparison, the
+  `strong` draft profile, the `review` polish profile, and any skipped role with
+  a reason.
 
 ## Legacy Rewrite Checklist
 
@@ -90,11 +111,18 @@ npm.cmd run build
 
 ## Channel Notes
 
-- Prefer `BLOG_DRAFT_STRONG_*` for long-form drafting or legacy rewrites.
+- Prefer `BLOG_DRAFT_STRONG_*` for long-form drafting or legacy rewrites; the
+  recommended generation model is GLM-5.2 or Gemini 3.1 Pro.
 - Prefer `BLOG_DRAFT_FAST_*` for outlines, summaries, and low-risk batch checks.
-- Reserve `BLOG_DRAFT_REVIEW_*` for optional secondary review; Codex still owns final fact, safety, and ingestion decisions.
+- Prefer `BLOG_DRAFT_REVIEW_*` for polishing; the recommended polish model is
+  DeepSeek V4 Pro. Codex still owns final fact, safety, and ingestion decisions.
 - Keep default `BLOG_DRAFT_*` as the shared fallback channel.
 - Keep `GEMINI_*` only as backward-compatible fallback.
+- Same-profile fallback channels may use
+  `BLOG_DRAFT_<PROFILE>_FALLBACK_<N>_*`. During real model-assisted generation
+  or polishing, these are tried serially after the selected profile's primary
+  channel fails. They are backup channels for the same role, not permission to
+  silently switch from `review` to `strong` or `fast`.
 - Record the provider/model label in draft metadata, but never record API keys or real private relay URLs in committed files.
 - Use separate relay profiles before any parallel model comparison.
 
@@ -102,5 +130,5 @@ Example commands:
 
 ```powershell
 npm.cmd run blog:draft -- --slug <slug> --force --generate --profile strong
-npm.cmd run blog:draft -- --slug <slug> --force --generate --profile fast
+npm.cmd run blog:draft -- --slug <slug> --polish-from content-drafts/<file>.md --profile review
 ```
